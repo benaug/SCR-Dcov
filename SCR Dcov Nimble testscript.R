@@ -103,7 +103,7 @@ constants<-list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
                 n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,res=data$res)
 
 #supply data to nimble
-dummy.data=rep(1,M)
+dummy.data=rep(0,M) #dummy data not used, doesn't really matter what the values are
 Nimdata<-list(y=y2D,z=z.data,X=X,dummy.data=dummy.data)
 
 # set parameters to monitor
@@ -126,6 +126,21 @@ conf$addSampler(target = c("N"),
                 type = 'zSampler',control = list(inds.detected=1:n,z.ups=z.ups,J=J,M=M),
                 silent = TRUE)
 
+
+#Nimble-assigned s sampler is fine, but there are two more options here:
+#1) update x and y locations jointly using RW_block
+#2) update x and y locations jointly, MH for z=1 inds, propose from prior for z=0 inds
+#not sure which is faster/yields better mixing.
+conf$removeSampler(paste("s[1:",M,", 1:2]", sep=""))
+for(i in 1:M){
+  conf$addSampler(target = paste("s[",i,", 1:2]", sep=""),
+                  type = 'RW_block',control=list(adaptive=TRUE,adaptScaleOnly=FALSE),silent = TRUE)
+  # conf$addSampler(target = paste("s[",i,", 1:2]", sep=""),
+  # type = 'sSampler',control=list(i=i,res=data$res,n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,
+  #                                xlim=data$xlim,ylim=data$ylim,scale=0.25),silent = TRUE)
+  #scale parameter here is just the starting scale. It will be tuned.
+}
+
 # Build and compile
 Rmcmc <- buildMCMC(conf)
 # runMCMC(Rmcmc,niter=10) #this will run in R, used for better debugging
@@ -135,7 +150,7 @@ Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
 # Run the model.
 start.time2<-Sys.time()
-Cmcmc$run(5000,reset=FALSE) #short run for demonstration. can keep running this line to get more samples
+Cmcmc$run(10000,reset=FALSE) #short run for demonstration. can keep running this line to get more samples
 end.time<-Sys.time()
 end.time-start.time  # total time for compilation, replacing samplers, and fitting
 end.time-start.time2 # post-compilation run time
@@ -154,13 +169,17 @@ lambda.cell.idx=grep("lambda.cell",colnames(mvSamples2))
 burnin2=100
 
 
-
 #compare expected D plot to truth
+#posterior means
 lambda.cell.ests=colMeans(mvSamples2[burnin2:nrow(mvSamples2),lambda.cell.idx])
 
 par(mfrow=c(1,1),ask=FALSE)
+zlim=range(c(lambda.cell,lambda.cell.ests)) #use same zlim for plots below
 #truth
-image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Density")
-#estimate
-image(x.vals,y.vals,matrix(lambda.cell.ests,n.cells.x,n.cells.y),main="Expected Density")
+image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
+#estimate, posterior means
+image(x.vals,y.vals,matrix(lambda.cell.ests,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
 
+#cell ests vs. truth
+plot(lambda.cell.ests~lambda.cell,pch=16)
+abline(0,1,col="darkred",lwd=2)
