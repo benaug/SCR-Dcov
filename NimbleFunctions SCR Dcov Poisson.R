@@ -1,27 +1,36 @@
-getCell <- nimbleFunction(
-  run = function(s = double(1),res=double(0),cells=double(2)) {
-    returnType(double(0))
-    this.cell=cells[trunc(s[1]/res)+1,trunc(s[2]/res)+1]
-    return(this.cell)
-  }
-)
-
 dCell <- nimbleFunction(
-  run = function(x = double(0), s.cell = double(0), pi.cell = double(1),
+  run = function(x = double(0), pi.cell = double(0),
                  log = integer(0)) {
     returnType(double(0))
-    logProb <- log(pi.cell[s.cell])
+    logProb <- log(pi.cell)
     return(logProb)
   }
 )
 
 #make dummy random number generator to make nimble happy
 rCell <- nimbleFunction(
-  run = function(n = integer(0), s.cell = double(0), pi.cell = double(1)) {
+  run = function(n = integer(0),pi.cell = double(0)) {
     returnType(double(0))
     return(0)
   }
 )
+
+# dCell <- nimbleFunction(
+#   run = function(x = double(0), s.cell = double(0), pi.cell = double(1),
+#                  log = integer(0)) {
+#     returnType(double(0))
+#     logProb <- log(pi.cell[s.cell])
+#     return(logProb)
+#   }
+# )
+# 
+# #make dummy random number generator to make nimble happy
+# rCell <- nimbleFunction(
+#   run = function(n = integer(0), s.cell = double(0), pi.cell = double(1)) {
+#     returnType(double(0))
+#     return(0)
+#   }
+# )
 
 #------------------------------------------------------------------
 # Function for calculation detection rate
