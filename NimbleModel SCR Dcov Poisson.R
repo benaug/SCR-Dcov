@@ -11,7 +11,7 @@ NimModel <- nimbleCode({
   #--------------------------------------------------------------
   #Density model
   for(c in 1:n.cells) {
-    lambda.cell[c] <- exp(D.beta0 + D.beta1*D.cov[c])*cellArea #expected N in cell c
+    lambda.cell[c] <- InHabitat[c]*exp(D.beta0 + D.beta1*D.cov[c])*cellArea #expected N in cell c
     pi.cell[c] <- lambda.cell[c] / lambda.N #expected proportion of total N in cell c
   }
   lambda.N <- sum(lambda.cell[1:n.cells]) #expected N in state space
