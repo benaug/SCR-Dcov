@@ -1,36 +1,23 @@
 dCell <- nimbleFunction(
-  run = function(x = double(0), pi.cell = double(0),
+  run = function(x = double(0), pi.cell = double(0), InHabitat = double(0),
                  log = integer(0)) {
     returnType(double(0))
-    logProb <- log(pi.cell)
+    if(InHabitat==1){
+      logProb <- log(pi.cell)
+    }else{
+      logProb <- -Inf
+    }
     return(logProb)
   }
 )
 
 #make dummy random number generator to make nimble happy
 rCell <- nimbleFunction(
-  run = function(n = integer(0),pi.cell = double(0)) {
+  run = function(n = integer(0),pi.cell = double(0), InHabitat = double(0)) {
     returnType(double(0))
     return(0)
   }
 )
-
-# dCell <- nimbleFunction(
-#   run = function(x = double(0), s.cell = double(0), pi.cell = double(1),
-#                  log = integer(0)) {
-#     returnType(double(0))
-#     logProb <- log(pi.cell[s.cell])
-#     return(logProb)
-#   }
-# )
-# 
-# #make dummy random number generator to make nimble happy
-# rCell <- nimbleFunction(
-#   run = function(n = integer(0), s.cell = double(0), pi.cell = double(1)) {
-#     returnType(double(0))
-#     return(0)
-#   }
-# )
 
 #------------------------------------------------------------------
 # Function for calculation detection rate

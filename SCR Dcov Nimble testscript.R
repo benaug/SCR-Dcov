@@ -56,6 +56,16 @@ points(X,pch=4,cex=0.75)
 image(x.vals,y.vals,matrix(D.cov,n.cells.x,n.cells.y),main="Covariate Value")
 points(X,pch=4,cex=0.75,col="lightblue")
 
+#Additionally, maybe we want to exclude "non-habitat"
+#just removing the corners for simplicity
+InHabitat=rep(1,length(D.cov))
+InHabitat[dSS[,1]<2&dSS[,2]<2]=0
+InHabitat[dSS[,1]<2&dSS[,2]>12]=0
+InHabitat[dSS[,1]>12&dSS[,2]<2]=0
+InHabitat[dSS[,1]>12&dSS[,2]>12]=0
+
+image(x.vals,y.vals,matrix(InHabitat,n.cells.x,n.cells.y),main="Habitat")
+
 
 D.beta0=-2
 D.beta1=2
@@ -67,7 +77,7 @@ image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Densi
 points(X,pch=4,cex=0.75)
 
 #Simulate some data
-data=sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,
+data=sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InHabitat=InHabitat,
                   lam0=lam0,sigma=sigma,K=K,obstype=obstype,
                   X=X,xlim=xlim,ylim=ylim,res)
 
@@ -97,6 +107,31 @@ for(i in idx){
   }
 }
 
+#If using a habitat mask, move any s's initialized in non-habitat above to closest habitat
+e2dist = function (x, y){
+  i <- sort(rep(1:nrow(y), nrow(x)))
+  dvec <- sqrt((x[, 1] - y[i, 1])^2 + (x[, 2] - y[i, 2])^2)
+  matrix(dvec, nrow = nrow(x), ncol = nrow(y), byrow = F)
+}
+getCell = function(s,res,cells){
+  cells[trunc(s[1]/res)+1,trunc(s[2]/res)+1]
+}
+alldists=e2dist(s.init,data$dSS)
+alldists[,data$InHabitat==0]=Inf
+for(i in 1:M){
+  this.cell=data$cells[trunc(s.init[i,1]/data$res)+1,trunc(s.init[i,2]/data$res)+1]
+  if(data$InHabitat[this.cell]==0){
+    cands=alldists[i,]
+    new.cell=which(alldists[i,]==min(alldists[i,]))
+    s.init[i,]=data$dSS[new.cell,]
+  }
+}
+
+#plot to make sure initialized activity centers are in habitat
+image(data$x.vals,data$y.vals,matrix(data$InHabitat,data$n.cells.x,data$n.cells.y))
+points(s.init,pch=16)
+
+
 z.init=1*(rowSums(y2D)>0)
 z.data=rep(NA,M)
 z.data[1:n]=1
@@ -111,7 +146,7 @@ constants<-list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
 
 #supply data to nimble
 dummy.data=rep(0,M) #dummy data not used, doesn't really matter what the values are
-Nimdata<-list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=cells)
+Nimdata<-list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=cells,InHabitat=data$InHabitat)
 
 # set parameters to monitor
 parameters<-c('N','lambda.N','lam0','sigma','D.beta0',"D.beta1")
@@ -186,16 +221,20 @@ burnin2=10
 
 
 #compare expected D plot to truth
+#image will show 
 #posterior means
 lambda.cell.ests=colMeans(mvSamples2[burnin2:nrow(mvSamples2),lambda.cell.idx])
+#remove non-habitat
+lambda.cell.ests[InHabitat==0]=NA
+lambda.cell[InHabitat==0]=NA
 
 par(mfrow=c(1,1),ask=FALSE)
-zlim=range(c(lambda.cell,lambda.cell.ests)) #use same zlim for plots below
+zlim=range(c(lambda.cell,lambda.cell.ests),na.rm=TRUE) #use same zlim for plots below
 #truth
 image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
 #estimate, posterior means
 image(x.vals,y.vals,matrix(lambda.cell.ests,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
 
 #cell ests vs. truth
-plot(lambda.cell.ests~lambda.cell,pch=16)
+plot(lambda.cell.ests~lambda.cell,pch=16) #remove non-habitat
 abline(0,1,col="darkred",lwd=2)
