@@ -161,9 +161,6 @@ parameters2 <- c("lambda.cell","s.cell")
 nt <- 1 #thinning rate for parameters
 nt2 <- 5 #thinning rate for paremeters2
 
-#Put all parameters except density covaraites here (see comment at top of script about RAM use, configure speed)
-# configure.nodes <- c("lam0","sigma","s")
-
 # Build the model, configure the mcmc, and compile
 start.time<-Sys.time()
 Rmodel <- nimbleModel(code=NimModel, constants=constants, data=Nimdata,check=FALSE,inits=Niminits)
