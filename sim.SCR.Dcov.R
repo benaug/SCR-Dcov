@@ -5,10 +5,8 @@ e2dist = function (x, y){
 }
 
 sim.SCR.Dcov<-
-  function(D.beta0=NA,D.beta1=NA,D.cov=NA,InHabitat=NA,lam0=NA,sigma=NA,
-           K=NA,obstype=NA,
-           X=NA,xlim=NA,ylim=NA,
-           res=NA){
+  function(D.beta0=NA,D.beta1=NA,D.cov=NA,InHabitat=NA,lam0=NA,p0=NA,sigma=NA,
+           K=NA,obstype=NA,X=NA,xlim=NA,ylim=NA,res=NA){
     #get expected N
     lambda.cell=exp(D.beta0 + D.beta1*D.cov)*cellArea
     lambda.N=sum(lambda.cell)
@@ -16,13 +14,16 @@ sim.SCR.Dcov<-
     N=rpois(1,lambda.N)
     
     #recreate some Dcov things so we can pass fewer arguments into this function
-    x.vals=seq(xlim[1],xlim[2],by=res)
-    y.vals=seq(ylim[1],ylim[2],by=res)
-    dSS=as.matrix(expand.grid(x.vals,y.vals))
-    cells=matrix(1:nrow(dSS),nrow=length(x.vals),ncol=length(y.vals))
-    n.cells=nrow(dSS)
-    n.cells.x=length(x.vals)
-    n.cells.y=length(y.vals)
+    x.vals <- seq(xlim[1],xlim[2],by=res)
+    y.vals <- seq(ylim[1],ylim[2],by=res)
+    dSS <- as.matrix(expand.grid(x.vals,y.vals)) + res/2 #add res/2 to get cell centroids
+    #remove extra cells created outside xlim and ylim
+    rem.idx <- which(dSS[,1]>xlim[2]|dSS[,2]>ylim[2])
+    dSS <- dSS[-rem.idx,]
+    cells <- matrix(1:nrow(dSS),nrow=length(x.vals)-1,ncol=length(y.vals)-1)
+    n.cells <- nrow(dSS)
+    n.cells.x <- length(x.vals) - 1
+    n.cells.y <- length(y.vals) - 1
     
     # simulate a population of activity centers
     pi.cell=lambda.cell/sum(lambda.cell)
@@ -37,13 +38,12 @@ sim.SCR.Dcov<-
       s[i,2]=runif(1,y.vals[tmp[2]],y.vals[tmp[2]+1])
     }
     D<- e2dist(s,X)
-    lamd<- lam0*exp(-D*D/(2*sigma*sigma))
     J<- nrow(X)
     
     # Capture individuals
     y=array(0,dim=c(N,J,K))
     if(obstype=="bernoulli"){
-      pd=1-exp(-lamd)
+      pd<- p0*exp(-D*D/(2*sigma*sigma))
       for(i in 1:N){
         for(j in 1:J){
           for(k in 1:K){
@@ -52,6 +52,7 @@ sim.SCR.Dcov<-
         }
       }
     }else if(obstype=="poisson"){
+      lamd<- lam0*exp(-D*D/(2*sigma*sigma))
       for(i in 1:N){
         for(j in 1:J){
           for(k in 1:K){
@@ -60,6 +61,7 @@ sim.SCR.Dcov<-
         }
       } 
     }else if(obstype=="negbin"){
+      lamd<- lam0*exp(-D*D/(2*sigma*sigma))
       for(i in 1:N){
         for(j in 1:J){
           for(k in 1:K){
@@ -70,7 +72,7 @@ sim.SCR.Dcov<-
     }else{
       stop("obstype not recognized")
     }
-
+    
     #discard uncaptured inds and aggregate true IDcovs for all samples, keeping track of where they came from with A matrix (used to put observed data back together)
     caught=which(apply(y,c(1),sum)>0)
     y.true=y
