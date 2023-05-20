@@ -8,6 +8,7 @@ sim.SCR.Dcov<-
   function(D.beta0=NA,D.beta1=NA,D.cov=NA,InHabitat=NA,lam0=NA,p0=NA,sigma=NA,
            K=NA,obstype=NA,X=NA,xlim=NA,ylim=NA,res=NA){
     #get expected N
+    cellArea=res^2
     lambda.cell=exp(D.beta0 + D.beta1*D.cov)*cellArea
     lambda.N=sum(lambda.cell)
     #simulate realized N
@@ -82,7 +83,7 @@ sim.SCR.Dcov<-
     }
     n=length(caught)
     
-    out<-list(y=y,X=X,K=K,buff=buff,obstype=obstype,s=s,n=nrow(y),K=K,
+    out<-list(y=y,X=X,K=K,obstype=obstype,s=s,n=nrow(y),K=K,
               xlim=xlim,ylim=ylim,x.vals=x.vals,y.vals=y.vals,dSS=dSS,cells=cells,
               n.cells=n.cells,n.cells.x=n.cells.x,n.cells.y=n.cells.y,s.cell=s.cell,
               D.cov=D.cov,InHabitat=InHabitat,res=res,cellArea=cellArea,N=N,lambda.N=lambda.N)
