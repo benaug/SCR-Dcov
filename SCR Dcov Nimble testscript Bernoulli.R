@@ -146,6 +146,8 @@ Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,
                  p0=p0,sigma=sigma,D.beta0=0,D.beta1=0)
 
 #constants for Nimble
+#here, you probably want to center your D.cov. The one I simulated for this testscript is already centered.
+# D.cov.use <- data$D.cov - mean(data$D.cov) #plug this into constants$D.cov if centering
 constants<-list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
                 D.cov=data$D.cov,cellArea=data$cellArea,n.cells=data$n.cells,
                 res=data$res)
@@ -174,7 +176,10 @@ conf$addSampler(target = c("N"),
                 type = 'zSampler',control = list(inds.detected=1:n,z.ups=z.ups,J=J,M=M),
                 silent = TRUE)
 
-#Can try block RW sampler if D.cov posteriors strongly correlated
+#Can try block RW sampler if D.cov posteriors strongly correlated, but only so much
+#can be done--most of the posterior correlation due to the fact that different regions
+#of the D.cov posteriors are consistent with very different activity center configurations
+#and it takes a long time to move the activity centers around
 # conf$removeSampler(c("D.beta0","D.beta1"))
 # conf$addSampler(target = c("D.beta0","D.beta1"),type = 'RW_block',control = list(),silent = TRUE)
 
@@ -189,8 +194,7 @@ for(i in 1:M){
   #                 type = 'RW_block',control=list(adaptive=TRUE,adaptScaleOnly=FALSE),silent = TRUE)
   conf$addSampler(target = paste("s[",i,", 1:2]", sep=""),
   type = 'sSampler',control=list(i=i,res=data$res,n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,
-                                 xlim=data$xlim,ylim=data$ylim,scale=0.25),silent = TRUE)
-  #scale parameter here is just the starting scale. It will be tuned.
+                                 xlim=data$xlim,ylim=data$ylim),silent = TRUE)
 }
 
 # Build and compile
