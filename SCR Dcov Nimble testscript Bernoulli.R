@@ -4,6 +4,7 @@ source("sim.SCR.Dcov.R")
 source("NimbleModel SCR Dcov Bernoulli.R")
 source("NimbleFunctions SCR Dcov Bernoulli.R")
 source("sSampler.R")
+source("mask.check.R")
 
 #If using Nimble version 0.13.1 and you must run this line 
 nimbleOptions(determinePredictiveNodesInModel = FALSE)
