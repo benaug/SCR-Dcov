@@ -88,6 +88,11 @@ data <- sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InHabitat=InHab
 
 points(data$s,pch=16)
 
+#function to test for errors in mask set up. 
+mask.check(dSS=data$dSS,cells=data$cells,n.cells=data$n.cells,n.cells.x=data$n.cells.x,
+           n.cells.y=data$n.cells.y,res=data$res,xlim=data$xlim,ylim=data$ylim,
+           x.vals=data$x.vals,y.vals=data$y.vals)
+
 #Data augmentation level
 M <- 150
 
