@@ -47,7 +47,7 @@ sSampler <- nimbleFunction(
       #propose new cell
       model$s.cell[i] <<- rcat(1,model$pi.cell)
       #propose x and y in new cell
-      s.cell.x <- model$s.cell[i]%%n.cells.y
+      s.cell.x <- model$s.cell[i]%%n.cells.x
       s.cell.y <- floor(model$s.cell[i]/n.cells.x)+1
       xlim.cell=c(s.cell.x-1,s.cell.x)*res
       ylim.cell=c(s.cell.y-1,s.cell.y)*res
