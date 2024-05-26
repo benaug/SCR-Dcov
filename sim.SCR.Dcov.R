@@ -5,7 +5,7 @@ e2dist = function (x, y){
 }
 
 sim.SCR.Dcov<-
-  function(D.beta0=NA,D.beta1=NA,D.cov=NA,InHabitat=NA,lam0=NA,p0=NA,sigma=NA,
+  function(D.beta0=NA,D.beta1=NA,D.cov=NA,InSS=NA,lam0=NA,p0=NA,sigma=NA,
            K=NA,obstype=NA,X=NA,xlim=NA,ylim=NA,res=NA){
     #get expected N
     cellArea=res^2
@@ -29,7 +29,7 @@ sim.SCR.Dcov<-
     # simulate a population of activity centers
     pi.cell=lambda.cell/sum(lambda.cell)
     #zero out non-habitat
-    pi.cell[InHabitat==0]=0
+    pi.cell[InSS==0]=0
     s.cell=sample(1:n.cells,N,prob=pi.cell,replace=TRUE)
     #distribute activity centers uniformly inside cells
     s=matrix(NA,nrow=N,ncol=2)
@@ -86,6 +86,6 @@ sim.SCR.Dcov<-
     out<-list(y=y,X=X,K=K,obstype=obstype,s=s,n=nrow(y),K=K,
               xlim=xlim,ylim=ylim,x.vals=x.vals,y.vals=y.vals,dSS=dSS,cells=cells,
               n.cells=n.cells,n.cells.x=n.cells.x,n.cells.y=n.cells.y,s.cell=s.cell,
-              D.cov=D.cov,InHabitat=InHabitat,res=res,cellArea=cellArea,N=N,lambda.N=lambda.N)
+              D.cov=D.cov,InSS=InSS,res=res,cellArea=cellArea,N=N,lambda.N=lambda.N)
     return(out)
   }

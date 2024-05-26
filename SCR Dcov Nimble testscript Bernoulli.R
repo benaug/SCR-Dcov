@@ -64,13 +64,13 @@ points(X,pch=4,cex=0.75,col="lightblue")
 #Additionally, maybe we want to exclude "non-habitat"
 #just removing the corners here for simplicity
 dSS.tmp <- dSS - res/2 #convert back to grid locs
-InHabitat=rep(1,length(D.cov))
-InHabitat[dSS.tmp[,1]<2&dSS.tmp[,2]<2] <- 0
-InHabitat[dSS.tmp[,1]<2&dSS.tmp[,2]>12] <- 0
-InHabitat[dSS.tmp[,1]>12&dSS.tmp[,2]<2] <- 0
-InHabitat[dSS.tmp[,1]>12&dSS.tmp[,2]>12] <- 0
+InSS=rep(1,length(D.cov))
+InSS[dSS.tmp[,1]<2&dSS.tmp[,2]<2] <- 0
+InSS[dSS.tmp[,1]<2&dSS.tmp[,2]>12] <- 0
+InSS[dSS.tmp[,1]>12&dSS.tmp[,2]<2] <- 0
+InSS[dSS.tmp[,1]>12&dSS.tmp[,2]>12] <- 0
 
-image(x.vals,y.vals,matrix(InHabitat,n.cells.x,n.cells.y),main="Habitat")
+image(x.vals,y.vals,matrix(InSS,n.cells.x,n.cells.y),main="Habitat")
 
 #Density covariates
 D.beta0 <- -2
@@ -83,7 +83,7 @@ image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Densi
 points(X,pch=4,cex=0.75)
 
 #Simulate some data
-data <- sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InHabitat=InHabitat,
+data <- sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InSS=InSS,
                   p0=p0,sigma=sigma,K=K,obstype=obstype,
                   X=X,xlim=xlim,ylim=ylim,res=res)
 
@@ -128,10 +128,10 @@ getCell  <-  function(s,res,cells){
   cells[trunc(s[1]/res)+1,trunc(s[2]/res)+1]
 }
 alldists <- e2dist(s.init,data$dSS)
-alldists[,data$InHabitat==0] <- Inf
+alldists[,data$InSS==0] <- Inf
 for(i in 1:M){
   this.cell <- data$cells[trunc(s.init[i,1]/data$res)+1,trunc(s.init[i,2]/data$res)+1]
-  if(data$InHabitat[this.cell]==0){
+  if(data$InSS[this.cell]==0){
     cands <- alldists[i,]
     new.cell <- which(alldists[i,]==min(alldists[i,]))
     s.init[i,] <- data$dSS[new.cell,]
@@ -139,7 +139,7 @@ for(i in 1:M){
 }
 
 #plot to make sure initialized activity centers are in habitat
-image(data$x.vals,data$y.vals,matrix(data$InHabitat,data$n.cells.x,data$n.cells.y))
+image(data$x.vals,data$y.vals,matrix(data$InSS,data$n.cells.x,data$n.cells.y))
 points(s.init,pch=16)
 
 
@@ -149,22 +149,22 @@ z.data[1:n] <- 1
 
 #inits for nimble - MUST use z init and N init for data augmentation scheme to work. should use s.init, too.
 Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,
-                 p0=p0,sigma=sigma,D.beta0=0,D.beta1=0)
+                 p0=p0,sigma=sigma,D0=sum(z.init)/(sum(InSS)*res^2),D.beta1=0)
 
 #constants for Nimble
 #here, you probably want to center your D.cov. The one I simulated for this testscript is already centered.
 # D.cov.use <- data$D.cov - mean(data$D.cov) #plug this into constants$D.cov if centering
-constants<-list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
+constants <- list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
                 D.cov=data$D.cov,cellArea=data$cellArea,n.cells=data$n.cells,
                 res=data$res)
 
 #supply data to nimble
 dummy.data <- rep(0,M) #dummy data not used, doesn't really matter what the values are
-Nimdata<-list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=cells,InHabitat=data$InHabitat)
+Nimdata <- list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=cells,InSS=data$InSS)
 
 # set parameters to monitor
-parameters<-c('N','lambda.N','p0','sigma','D.beta0',"D.beta1")
-parameters2 <- c("lambda.cell","s.cell")
+parameters<-c('N','lambda.N','p0','sigma','D0',"D.beta1")
+parameters2 <- c("lambda.cell","s.cell",'D0') #record D0 here for plotting
 nt <- 1 #thinning rate for parameters
 nt2 <- 5 #thinning rate for paremeters2
 
@@ -203,6 +203,11 @@ for(i in 1:M){
                                  xlim=data$xlim,ylim=data$ylim),silent = TRUE)
 }
 
+conf$addSampler(target = c("D0","D.beta1"),
+                type = 'RW_block',control=list(adaptive=TRUE),silent = TRUE)
+conf$addSampler(target = c("p0","sigma"),
+                type = 'RW_block',control=list(adaptive=TRUE),silent = TRUE)
+
 # Build and compile
 Rmcmc <- buildMCMC(conf)
 # runMCMC(Rmcmc,niter=10) #this will run in R, used for better debugging
@@ -228,16 +233,18 @@ data$lambda
 
 mvSamples2  <-  as.matrix(Cmcmc$mvSamples2)
 lambda.cell.idx <- grep("lambda.cell",colnames(mvSamples2))
+D0.idx <- grep("D0",colnames(mvSamples2))
 burnin2 <- 10
 
 
 #compare expected D plot to truth
 #image will show 
 #posterior means
-lambda.cell.ests <- colMeans(mvSamples2[burnin2:nrow(mvSamples2),lambda.cell.idx])
+lambda.cell.post <- cellArea*mvSamples2[burnin2:nrow(mvSamples2),D0.idx]*mvSamples2[burnin2:nrow(mvSamples2),lambda.cell.idx]
+lambda.cell.ests <- colMeans(lambda.cell.post)
 #remove non-habitat
-lambda.cell.ests[InHabitat==0] <- NA
-lambda.cell[InHabitat==0] <- NA
+lambda.cell.ests[InSS==0] <- NA
+lambda.cell[InSS==0] <- NA
 
 par(mfrow=c(1,1),ask=FALSE)
 zlim <- range(c(lambda.cell,lambda.cell.ests),na.rm=TRUE) #use same zlim for plots below
@@ -249,3 +256,4 @@ image(x.vals,y.vals,matrix(lambda.cell.ests,n.cells.x,n.cells.y),main="Expected 
 #cell ests vs. truth
 plot(lambda.cell.ests~lambda.cell,pch=16) #remove non-habitat
 abline(0,1,col="darkred",lwd=2)
+
