@@ -43,7 +43,7 @@ sSampler <- nimbleFunction(
   },
   run = function() {
     z <- model$z[i]
-    if(z==0){#propose from unifrom prior
+    if(z==0){#propose from uniform prior
       #propose new cell
       model$s.cell[i] <<- rcat(1,model$pi.cell)
       #propose x and y in new cell
@@ -72,7 +72,7 @@ sSampler <- nimbleFunction(
         } else {
           copy(from = mvSaved, to = model, row = 1, nodes = calcNodes, logProb = TRUE)
         }
-        if(adaptive){ #we only tune for z=0 proposals
+        if(adaptive){ #we only tune for z=1 proposals
           adaptiveProcedure(accept)
         }
       }
