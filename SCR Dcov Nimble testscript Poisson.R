@@ -61,7 +61,7 @@ points(X,pch=4,cex=0.75,col="lightblue")
 #Additionally, maybe we want to exclude "non-habitat"
 #just removing the corners here for simplicity
 dSS.tmp <- dSS - res/2 #convert back to grid locs
-InSS=rep(1,length(D.cov))
+InSS <- rep(1,length(D.cov))
 InSS[dSS.tmp[,1]<2&dSS.tmp[,2]<2] <- 0
 InSS[dSS.tmp[,1]<2&dSS.tmp[,2]>12] <- 0
 InSS[dSS.tmp[,1]>12&dSS.tmp[,2]<2] <- 0
@@ -104,14 +104,14 @@ y2D <- matrix(0,M,J)
 y2D[1:n,] <- apply(data$y,c(1,2),sum)
 xlim <- data$xlim
 ylim <- data$ylim
-s.init<- cbind(runif(M,xlim[1],xlim[2]), runif(M,ylim[1],ylim[2])) #assign random locations
+s.init <- cbind(runif(M,xlim[1],xlim[2]), runif(M,ylim[1],ylim[2])) #assign random locations
 idx <- which(rowSums(y2D)>0) #switch for those actually caught
 for(i in idx){
-  trps<- matrix(X[y2D[i,]>0,1:2],ncol=2,byrow=FALSE)
+  trps <- matrix(X[y2D[i,]>0,1:2],ncol=2,byrow=FALSE)
   if(nrow(trps)>1){
-    s.init[i,]<- c(mean(trps[,1]),mean(trps[,2]))
+    s.init[i,] <- c(mean(trps[,1]),mean(trps[,2]))
   }else{
-    s.init[i,]<- trps
+    s.init[i,] <- trps
   }
 }
 

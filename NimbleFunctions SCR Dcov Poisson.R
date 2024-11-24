@@ -52,8 +52,8 @@ dPoissonVector <- nimbleFunction(
 rPoissonVector <- nimbleFunction(
   run = function(n = integer(0),lam = double(1),z = double(0)) {
     returnType(double(1))
-    J=nimDim(lam)[1]
-    out=numeric(J,value=0)
+    J <- nimDim(lam)[1]
+    out <- numeric(J,value=0)
     return(out)
   }
 )
@@ -76,16 +76,16 @@ zSampler <- nimbleFunction(
   run = function() {
     for(up in 1:z.ups){ #how many updates per iteration?
       #propose to add/subtract 1
-      updown=rbinom(1,1,0.5) #p=0.5 is symmetric. If you change this, must account for asymmetric proposal
-      reject=FALSE #we auto reject if you select a detected call
+      updown <- rbinom(1,1,0.5) #p=0.5 is symmetric. If you change this, must account for asymmetric proposal
+      reject <- FALSE #we auto reject if you select a detected call
       if(updown==0){#subtract
         #find all z's currently on
-        z.on=which(model$z==1)
-        n.z.on=length(z.on)
-        pick=rcat(1,rep(1/n.z.on,n.z.on)) #select one of these individuals
-        pick=z.on[pick]
+        z.on <- which(model$z==1)
+        n.z.on <- length(z.on)
+        pick <- rcat(1,rep(1/n.z.on,n.z.on)) #select one of these individuals
+        pick <- z.on[pick]
         if(any(pick==inds.detected)){ #is this individual detected?
-          reject=TRUE #if so, we reject (could never select these inds, but then need to account for asymmetric proposal)
+          reject <- TRUE #if so, we reject (could never select these inds, but then need to account for asymmetric proposal)
         }
         if(!reject){
           #get initial logprobs for N and y
@@ -120,10 +120,10 @@ zSampler <- nimbleFunction(
         }
       }else{#add
         if(model$N[1] < M){ #cannot update if z maxed out. Need to raise M
-          z.off=which(model$z==0)
-          n.z.off=length(z.off)
-          pick=rcat(1,rep(1/n.z.off,n.z.off)) #select one of these individuals
-          pick=z.off[pick]
+          z.off <- which(model$z==0)
+          n.z.off <- length(z.off)
+          pick <- rcat(1,rep(1/n.z.off,n.z.off)) #select one of these individuals
+          pick <- z.off[pick]
           
           #get initial logprobs for N and y
           lp.initial.N <- model$getLogProb(N.node)

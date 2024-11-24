@@ -41,7 +41,7 @@ sim.SCR.Dcov <-
     # Capture individuals
     y <- array(0,dim=c(N,J,K))
     if(obstype=="bernoulli"){
-      pd<- p0*exp(-D*D/(2*sigma*sigma))
+      pd <- p0*exp(-D*D/(2*sigma*sigma))
       for(i in 1:N){
         for(j in 1:J){
           for(k in 1:K){
@@ -50,7 +50,7 @@ sim.SCR.Dcov <-
         }
       }
     }else if(obstype=="poisson"){
-      lamd<- lam0*exp(-D*D/(2*sigma*sigma))
+      lamd <- lam0*exp(-D*D/(2*sigma*sigma))
       for(i in 1:N){
         for(j in 1:J){
           for(k in 1:K){
@@ -59,7 +59,7 @@ sim.SCR.Dcov <-
         }
       } 
     }else if(obstype=="negbin"){
-      lamd<- lam0*exp(-D*D/(2*sigma*sigma))
+      lamd <- lam0*exp(-D*D/(2*sigma*sigma))
       for(i in 1:N){
         for(j in 1:J){
           for(k in 1:K){
