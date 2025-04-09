@@ -1,8 +1,5 @@
 NimModel <- nimbleCode({
-  #--------------------------------------------------------------
-  # priors
-  #--------------------------------------------------------------
-  #Density covariates
+  #Density parameter priors
   D0 ~ dunif(0,100) #uninformative, diffuse dnorm on log scale can cause neg bias
   # D.beta0 ~ dnorm(0,sd=10)
   D.beta1 ~ dnorm(0,sd=10)
