@@ -1,8 +1,8 @@
 library(nimble)
 library(coda)
-source("sim.SCR.Dcov.R")
-source("NimbleModel SCR Dcov Poisson.R")
-source("NimbleFunctions SCR Dcov Poisson.R")
+source("sim.SCR.Dcov.Mb.R")
+source("NimbleModel SCR Dcov Bernoulli Mb.R")
+source("NimbleFunctions SCR Dcov Bernoulli Mb.R")
 source("sSampler.R")
 source("mask.check.R")
 
@@ -16,17 +16,17 @@ library(RColorBrewer)
 cols1 <- brewer.pal(9,"Greens")
 
 #simulate some data
-lam0 <- 0.25 #baseline detection rate
+p0.p <- 0.25 #baseline detection probability, first capture
+p0.c <- 0.50 #baseline detection probability, subsequent capture
 sigma <- 0.50 #detection spatial scale
 K <- 5 #number of occasions
 buff <- 2 #state space buffer. Should be at least 3 sigma (generally).
 X <- as.matrix(expand.grid(3:11,3:11)) #trapping array
-obstype <- "poisson" #observation model
 
 ### Habitat Covariate stuff###
 #get x and y extent by buffering state space
-xlim <- range(X[,1])+c(-buff,buff)
-ylim <- range(X[,2])+c(-buff,buff)
+xlim <- range(X[,1]) + c(-buff,buff)
+ylim <- range(X[,2]) + c(-buff,buff)
 #shift X, xlim, ylim, so lower left side of state space is (0,0)
 #this is required to use efficient look-up table to find the cell number
 #of a continuous location
@@ -68,6 +68,7 @@ InSS[min.dists<(3*sigma)] <- 1
 image(x.vals,y.vals,matrix(D.cov*InSS,n.cells.x,n.cells.y),main="Habitat",col=cols1)
 points(X,pch=4,col="darkred",lwd=2)
 
+
 #Density covariates
 D.beta0 <- -1
 D.beta1 <- 0.5
@@ -80,28 +81,67 @@ points(X,pch=4,cex=0.75)
 
 #Simulate some data
 set.seed(33923) #seed set above for D.cov. Change seed here to simulate different data sets
-data <- sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InSS=InSS,
-                  lam0=lam0,sigma=sigma,K=K,obstype=obstype,
+data <- sim.SCR.Dcov.Mb(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InSS=InSS,
+                  p0.p=p0.p,p0.c=p0.c,sigma=sigma,K=K,
                   X=X,xlim=xlim,ylim=ylim,res=res)
-
 points(data$s,pch=16)
 
 #function to test for errors in mask set up. 
 mask.check(dSS=data$dSS,cells=data$cells,n.cells=data$n.cells,n.cells.x=data$n.cells.x,
-           n.cells.y=data$n.cells.y,res=data$res,xlim=data$xlim,ylim=data$ylim,
-           x.vals=data$x.vals,y.vals=data$y.vals)
+                       n.cells.y=data$n.cells.y,res=data$res,xlim=data$xlim,ylim=data$ylim,
+                       x.vals=data$x.vals,y.vals=data$y.vals)
 
 #Data augmentation level
 M <- 150
+J <- nrow(data$X)
+y <- array(0,dim=c(M,J,K))
+y[1:data$n,,] <- data$y
+K2D <- data$K2D
 
-#trap operation matrix
-J <- nrow(X)
-K1D <- rep(K,J)
+#restructure data into first and subsequent capture structures
+y.p <- y.c <- K1D.p <- K1D.c <- matrix(0,M,J)
+for(i in 1:M){
+  for(j in 1:J){
+    position <- Position(y[i,j,],f=function(x){x>0})#occasion of first capture, NA if no capture
+    if(is.na(position)){#no capture
+      K1D.p[i,j] <- sum(K2D[j,1:K]) #sum trap op
+      K1D.c[i,j] <- 0 #no subsequent capture events
+    }else{#there is a first capture
+      K1D.p[i,j] <- sum(K2D[j,1:position]) #sum trap op up to first capture event
+      if(position<K){#was first capture not last occasion?
+        K1D.c[i,j] <- sum(K2D[j,(position+1):K]) #sum trap op after first capture event for subsequent capture
+      }else{#otherwise, no subsequent capture events
+        K1D.c[i,j] <- 0
+      }
+      y.p[i,j] <- y[i,j,position]
+    }
+  }
+}
 
-#Augment and initialize
-n <- data$n
-y2D <- matrix(0,M,J)
-y2D[1:n,] <- apply(data$y,c(1,2),sum)
+y2D <- apply(y,c(1,2),sum)
+y.c <- y2D-y.p
+
+#I have not tested that the algorithm above is correct in all cases of trap operation entered.
+##Check for bugs here##
+for(i in 1:M){
+  for(j in 1:J){
+    y.check <- y[i,j,]
+    if(sum(y.check)>0){
+      if(y.p[i,j]!=1)stop("bug in y1")
+      if(y.c[i,j]!=(sum(y.check)-1))stop("bug in y2")
+      first.cap.k.on <- which(y.check[K2D[j,]==1]==1)[1] #first capture occasion counting only operable occasions
+      if(K1D.p[i,j]!=first.cap.k.on)stop("bug in K1D.p")
+      if(K1D.c[i,j]!=(sum(K2D[j,1:K])-first.cap.k.on))stop("bug in K1D.c")
+    }else{
+      if(y.p[i,j]!=0)stop("bug in y1")
+      if(y.c[i,j]!=0)stop("bug in y2")
+      if(K1D.p[i,j]!=sum(K2D[j,1:K]))stop("bug in K1D.p")
+      if(K1D.c[i,j]!=0)stop("bug in K1D.c")
+    }
+  }
+}
+
+#init the rest
 xlim <- data$xlim
 ylim <- data$ylim
 s.init <- cbind(runif(M,xlim[1],xlim[2]), runif(M,ylim[1],ylim[2])) #assign random locations
@@ -116,11 +156,6 @@ for(i in idx){
 }
 
 #If using a habitat mask, move any s's initialized in non-habitat above to closest habitat
-e2dist  <-  function (x, y){
-  i <- sort(rep(1:nrow(y), nrow(x)))
-  dvec <- sqrt((x[, 1] - y[i, 1])^2 + (x[, 2] - y[i, 2])^2)
-  matrix(dvec, nrow = nrow(x), ncol = nrow(y), byrow = F)
-}
 getCell  <-  function(s,res,cells){
   cells[trunc(s[1]/res)+1,trunc(s[2]/res)+1]
 }
@@ -141,34 +176,34 @@ points(s.init,pch=16)
 
 z.init <- 1*(rowSums(y2D)>0)
 z.data <- rep(NA,M)
-z.data[1:n] <- 1
+z.data[1:data$n] <- 1
 
-#inits for nimble
 #inits for nimble - MUST use z init and N init for data augmentation scheme to work. should use s.init, too.
-Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,lam0=runif(1,0.2,0.8),sigma=runif(1,0.2,0.8),
+Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,
+                 p0.p=runif(1,0.2,0.8),p0.p=runif(1,0.2,0.8),sigma=runif(1,0.2,0.8),
                  D0=sum(z.init)/(sum(InSS)*res^2),D.beta1=0)
 
 #constants for Nimble
 #here, you probably want to center your D.cov. The one I simulated for this testscript is already centered.
 # D.cov.use <- data$D.cov - mean(data$D.cov) #plug this into constants$D.cov if centering
-constants <- list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
+constants <- list(M=M,J=J,K1D.p=K1D.p,K1D.c=K1D.c,xlim=xlim,ylim=ylim,
                 D.cov=data$D.cov,cellArea=data$cellArea,n.cells=data$n.cells,
                 res=data$res)
 
 #supply data to nimble
 dummy.data <- rep(0,M) #dummy data not used, doesn't really matter what the values are
-Nimdata <- list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=cells,InSS=data$InSS)
+Nimdata <- list(y.p=y.p,y.c=y.c,z=z.data,X=X,dummy.data=dummy.data,cells=cells,InSS=data$InSS)
 
 # set parameters to monitor
-parameters <- c('N','lambda.N','lam0','sigma','D0',"D.beta1")
+parameters<-c('N','lambda.N','p0.p','p0.c','sigma','D0',"D.beta1")
 parameters2 <- c("lambda.cell","s.cell",'D0') #record D0 here for plotting
 nt <- 1 #thinning rate for parameters
 nt2 <- 5 #thinning rate for paremeters2
 
 # Build the model, configure the mcmc, and compile
-start.time<-Sys.time()
+start.time <- Sys.time()
 Rmodel <- nimbleModel(code=NimModel, constants=constants, data=Nimdata,check=FALSE,inits=Niminits)
-config.nodes <- c("lam0","sigma")
+config.nodes <- c("p0.p","p0.c","sigma")
 conf <- configureMCMC(Rmodel,monitors=parameters, thin=nt,monitors2=parameters2,thin2=nt2,
                       nodes=config.nodes,useConjugacy=FALSE)
 
@@ -181,15 +216,15 @@ conf$addSampler(target = c("N"),
 #add s sampler
 for(i in 1:M){
   conf$addSampler(target = paste("s[",i,", 1:2]", sep=""),
-                  type = 'sSampler',control=list(i=i,res=data$res,n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,
-                                                 xlim=data$xlim,ylim=data$ylim),silent = TRUE)
+  type = 'sSampler',control=list(i=i,res=data$res,n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,
+                                 xlim=data$xlim,ylim=data$ylim),silent = TRUE)
 }
 
 #add blocked sampler for Dcovs
 conf$addSampler(target = c("D0","D.beta1"),
                 type = 'AF_slice',control=list(adaptive=TRUE),silent = TRUE)
-#add block sampler for lam0 and sigma. AF_slice slow here, using RW_block
-conf$addSampler(target = c("lam0","sigma"),
+#add block sampler for p0.p and sigma. AF_slice slow here, using RW_block
+conf$addSampler(target = c("p0.p","sigma"),
                 type = 'RW_block',control=list(adaptive=TRUE),silent = TRUE)
 
 # Build and compile
@@ -197,6 +232,7 @@ Rmcmc <- buildMCMC(conf)
 # runMCMC(Rmcmc,niter=10) #this will run in R, used for better debugging
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
+
 
 # Run the model.
 start.time2 <- Sys.time()
@@ -219,6 +255,7 @@ lambda.cell.idx <- grep("lambda.cell",colnames(mvSamples2))
 D0.idx <- grep("D0",colnames(mvSamples2))
 burnin2 <- 10
 
+
 #compare expected D plot to truth
 #image will show 
 #posterior means
@@ -234,7 +271,3 @@ zlim <- range(c(lambda.cell,lambda.cell.ests),na.rm=TRUE) #use same zlim for plo
 image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
 #estimate, posterior means
 image(x.vals,y.vals,matrix(lambda.cell.ests,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
-
-#cell ests vs. truth
-plot(lambda.cell.ests~lambda.cell,pch=16) #remove non-habitat
-abline(0,1,col="darkred",lwd=2)

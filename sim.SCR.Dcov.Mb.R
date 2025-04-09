@@ -4,9 +4,9 @@ e2dist <-  function (x, y){
   matrix(dvec, nrow = nrow(x), ncol = nrow(y), byrow = F)
 }
 
-sim.SCR.Dcov <-
-  function(D.beta0=NA,D.beta1=NA,D.cov=NA,InSS=NA,lam0=NA,p0=NA,sigma=NA,
-           K=NA,obstype=NA,X=NA,xlim=NA,ylim=NA,res=NA){
+sim.SCR.Dcov.Mb <-
+  function(D.beta0=NA,D.beta1=NA,D.cov=NA,InSS=NA,p0.p=NA,p0.c=NA,sigma=NA,
+           K=NA,X=NA,xlim=NA,ylim=NA,res=NA){
     #get expected N
     cellArea <- res^2
     lambda.cell <- exp(D.beta0 + D.beta1*D.cov)*cellArea
@@ -40,38 +40,22 @@ sim.SCR.Dcov <-
     
     # Capture individuals
     y <- array(0,dim=c(N,J,K))
-    if(obstype=="bernoulli"){
-      pd <- p0*exp(-D*D/(2*sigma*sigma))
-      for(i in 1:N){
-        for(j in 1:J){
-          for(k in 1:K){
-            y[i,j,k] <- rbinom(1,1,pd[i,j])
+    y.state <- array(0,dim=c(N,J,K))
+    pd.p <- p0.p*exp(-D*D/(2*sigma*sigma))
+    pd.c <- p0.c*exp(-D*D/(2*sigma*sigma))
+    for(i in 1:N){
+      for(j in 1:J){
+        for(k in 1:K){
+          y[i,j,k] <- rbinom(1,1,pd.p[i,j]*(y.state[i,j,k]==0) + 
+                               pd.c[i,j]*(y.state[i,j,k]==1))
+          if(y[i,j,k]==1&k!=K){
+            y.state[i,j,(k+1):K] <- 1
           }
         }
       }
-    }else if(obstype=="poisson"){
-      lamd <- lam0*exp(-D*D/(2*sigma*sigma))
-      for(i in 1:N){
-        for(j in 1:J){
-          for(k in 1:K){
-            y[i,j,k] <- rpois(1,lamd[i,j])
-          }
-        }
-      } 
-    }else if(obstype=="negbin"){
-      lamd <- lam0*exp(-D*D/(2*sigma*sigma))
-      for(i in 1:N){
-        for(j in 1:J){
-          for(k in 1:K){
-            y[i,j,k] <- rnbinom(1,mu=lamd[i,j],size=theta)
-          }
-        }
-      } 
-    }else{
-      stop("obstype not recognized")
     }
     
-    #discard uncaptured inds 
+    #discard uncaptured inds
     caught <- which(apply(y,c(1),sum)>0)
     y.true <- y
     y <- y[caught,,]
@@ -79,8 +63,10 @@ sim.SCR.Dcov <-
       y <- array(y,dim=c(dim(y),1))
     }
     n <- length(caught)
+    #create trap operation. assumed to be complete in data simulator
+    K2D <- matrix(1,J,K)
     
-    out <- list(y=y,X=X,K=K,obstype=obstype,s=s,n=nrow(y),K=K,J=J,
+    out <- list(y=y,X=X,K=K,s=s,n=nrow(y),K=K,K2D=K2D,J=J,
               xlim=xlim,ylim=ylim,x.vals=x.vals,y.vals=y.vals,dSS=dSS,cells=cells,
               n.cells=n.cells,n.cells.x=n.cells.x,n.cells.y=n.cells.y,s.cell=s.cell,
               D.cov=D.cov,InSS=InSS,res=res,cellArea=cellArea,N=N,lambda.N=lambda.N)

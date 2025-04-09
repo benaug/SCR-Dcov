@@ -11,11 +11,15 @@ nimbleOptions(determinePredictiveNodesInModel = FALSE)
 # #If using Nimble before version 0.13.1, run this line instead
 # nimble:::setNimbleOption('MCMCjointlySamplePredictiveBranches', FALSE)
 
+#get some colors
+library(RColorBrewer)
+cols1 <- brewer.pal(9,"Greens")
+
 #simulate some data
 p0 <- 0.25 #baseline detection probability
 sigma <- 0.50 #detection spatial scale
 K <- 5 #number of occasions
-buff <- 3 #state space buffer. Should be at least 3 sigma (generally).
+buff <- 2 #state space buffer. Should be at least 3 sigma (generally).
 X <- as.matrix(expand.grid(3:11,3:11)) #trapping array
 obstype <- "bernoulli" #observation model
 
@@ -33,7 +37,7 @@ ylim <- ylim-y.shift
 X[,1] <- X[,1]-x.shift
 X[,2] <- X[,2]-y.shift
 
-res <- 0.20 #habitat grid resolution, length of 1 cell side
+res <- 0.25 #habitat grid resolution, length of 1 cell side
 cellArea <- res^2 #area of one cell
 x.vals <- seq(xlim[1]+res/2,xlim[2]-res/2,res) #x cell centroids
 y.vals <- seq(ylim[1]+res/2,ylim[2]-res/2,res) #y cell centroids
@@ -43,31 +47,30 @@ n.cells <- nrow(dSS)
 n.cells.x <- length(x.vals)
 n.cells.y <- length(y.vals)
 
-#create a density covariate
-D.cov <- rep(NA,n.cells)
-for(c in 1:n.cells){
-  D.cov[c] <-  7*dSS[c,1] - 0.5*dSS[c,1]^2 + 7*dSS[c,2] - 0.5*dSS[c,2]^2
-}
-D.cov <- as.numeric(scale(D.cov))
+#create a density covariate - one for each session
+library(geoR)
+#need a simulated landscape with individuals living around traps to be captured
+set.seed(13225)
+D.cov <- grf(n.cells,grid=dSS,cov.pars=c(100,100),messages=FALSE)[[2]] #takes a while, run time depends on n.cells. 3600 cells pretty fast
+D.cov <- as.numeric(scale(D.cov)) #scale
 
-image(x.vals,y.vals,matrix(D.cov,n.cells.x,n.cells.y),main="Covariate Value")
-points(X,pch=4,cex=0.75,col="lightblue")
+par(mfrow=c(1,1),ask=FALSE)
+image(x.vals,y.vals,matrix(D.cov,n.cells.x,n.cells.y),main="D.cov",xlab="X",ylab="Y",col=cols1)
+points(X,pch=4,cex=0.75,col="darkred",lwd=2)
 
-
-#Additionally, maybe we want to exclude "non-habitat"
-#just removing the corners here for simplicity
+#Additionally, maybe we want to exclude "non-habitat" or limit the state space extent
+#let's use a 3sigma buffer
 dSS.tmp <- dSS - res/2 #convert back to grid locs
-InSS <- rep(1,length(D.cov))
-InSS[dSS.tmp[,1]<2&dSS.tmp[,2]<2] <- 0
-InSS[dSS.tmp[,1]<2&dSS.tmp[,2]>12] <- 0
-InSS[dSS.tmp[,1]>12&dSS.tmp[,2]<2] <- 0
-InSS[dSS.tmp[,1]>12&dSS.tmp[,2]>12] <- 0
-
-image(x.vals,y.vals,matrix(InSS,n.cells.x,n.cells.y),main="Habitat")
+InSS <- rep(0,length(D.cov))
+dists <- e2dist(X,dSS.tmp)
+min.dists <- apply(dists,2,min)
+InSS[min.dists<(3*sigma)] <- 1
+image(x.vals,y.vals,matrix(D.cov*InSS,n.cells.x,n.cells.y),main="Habitat",col=cols1)
+points(X,pch=4,col="darkred",lwd=2)
 
 #Density covariates
-D.beta0 <- -2
-D.beta1 <- 2
+D.beta0 <- -1
+D.beta1 <- 0.5
 #what is implied expected N in state space?
 lambda.cell <- exp(D.beta0 + D.beta1*D.cov)*cellArea
 sum(lambda.cell) #expected N in state space
@@ -76,6 +79,7 @@ image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Densi
 points(X,pch=4,cex=0.75)
 
 #Simulate some data
+set.seed(33923) #seed set above for D.cov. Change seed here to simulate different data sets
 data <- sim.SCR.Dcov(D.beta0=D.beta0,D.beta1=D.beta1,D.cov=D.cov,InSS=InSS,
                   p0=p0,sigma=sigma,K=K,obstype=obstype,
                   X=X,xlim=xlim,ylim=ylim,res=res)
@@ -141,8 +145,8 @@ z.data <- rep(NA,M)
 z.data[1:n] <- 1
 
 #inits for nimble - MUST use z init and N init for data augmentation scheme to work. should use s.init, too.
-Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,
-                 p0=p0,sigma=sigma,D0=sum(z.init)/(sum(InSS)*res^2),D.beta1=0)
+Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,p0=runif(1,0.2,0.8),sigma=runif(1,0.2,0.8),
+                 D0=sum(z.init)/(sum(InSS)*res^2),D.beta1=0)
 
 #constants for Nimble
 #here, you probably want to center your D.cov. The one I simulated for this testscript is already centered.
@@ -164,40 +168,28 @@ nt2 <- 5 #thinning rate for paremeters2
 # Build the model, configure the mcmc, and compile
 start.time<-Sys.time()
 Rmodel <- nimbleModel(code=NimModel, constants=constants, data=Nimdata,check=FALSE,inits=Niminits)
+config.nodes <- c("p0","sigma")
 conf <- configureMCMC(Rmodel,monitors=parameters, thin=nt,monitors2=parameters2,thin2=nt2,
-                      useConjugacy=FALSE) #configure very slow if checking for conjugacy
+                      nodes=config.nodes,useConjugacy=FALSE)
 
-
-###*required* sampler replacement
+#add N/z sampler
 z.ups <- round(M*0.25) # how many z proposals per iteration??? 25% of M generally seems good, but no idea what is optimal
 conf$removeSampler("N")
 conf$addSampler(target = c("N"),
                 type = 'zSampler',control = list(inds.detected=1:n,z.ups=z.ups,J=J,M=M),
                 silent = TRUE)
 
-#Can try block RW sampler if D.cov posteriors strongly correlated, but only so much
-#can be done--most of the posterior correlation due to the fact that different regions
-#of the D.cov posteriors are consistent with very different activity center configurations
-#and it takes a long time to move the activity centers around
-# conf$removeSampler(c("D.beta0","D.beta1"))
-# conf$addSampler(target = c("D.beta0","D.beta1"),type = 'RW_block',control = list(),silent = TRUE)
-
-
-#Nimble-assigned s sampler is fine, but there are two more options here:
-#1) update x and y locations jointly using RW_block
-#2) update x and y locations jointly, MH for z=1 inds, propose from prior for z=0 inds
-#not sure which is faster/yields better mixing. Proposing from dSS will be slower with more cells
-conf$removeSampler(paste("s[1:",M,", 1:2]", sep=""))
+#add s sampler
 for(i in 1:M){
-  # conf$addSampler(target = paste("s[",i,", 1:2]", sep=""),
-  #                 type = 'RW_block',control=list(adaptive=TRUE,adaptScaleOnly=FALSE),silent = TRUE)
   conf$addSampler(target = paste("s[",i,", 1:2]", sep=""),
-  type = 'sSampler',control=list(i=i,res=data$res,n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,
-                                 xlim=data$xlim,ylim=data$ylim),silent = TRUE)
+                  type = 'sSampler',control=list(i=i,res=data$res,n.cells.x=data$n.cells.x,n.cells.y=data$n.cells.y,
+                                                 xlim=data$xlim,ylim=data$ylim),silent = TRUE)
 }
 
+#add blocked sampler for Dcovs
 conf$addSampler(target = c("D0","D.beta1"),
-                type = 'RW_block',control=list(adaptive=TRUE),silent = TRUE)
+                type = 'AF_slice',control=list(adaptive=TRUE),silent = TRUE)
+#add block sampler for p0 and sigma. AF_slice slow here, using RW_block
 conf$addSampler(target = c("p0","sigma"),
                 type = 'RW_block',control=list(adaptive=TRUE),silent = TRUE)
 
@@ -207,16 +199,15 @@ Rmcmc <- buildMCMC(conf)
 Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 
-
 # Run the model.
 start.time2 <- Sys.time()
-Cmcmc$run(1000,reset=FALSE) #short run for demonstration. can keep running this line to get more samples
+Cmcmc$run(2500,reset=FALSE) #short run for demonstration. can keep running this line to get more samples
 end.time <- Sys.time()
-end.time-start.time  # total time for compilation, replacing samplers, and fitting
-end.time-start.time2 # post-compilation run time
+end.time - start.time  # total time for compilation, replacing samplers, and fitting
+end.time - start.time2 # post-compilation run time
 
 library(coda)
-mvSamples <-as.matrix(Cmcmc$mvSamples)
+mvSamples <- as.matrix(Cmcmc$mvSamples)
 burnin <- 250
 plot(mcmc(mvSamples[burnin:nrow(mvSamples),]))
 
@@ -228,7 +219,6 @@ mvSamples2  <-  as.matrix(Cmcmc$mvSamples2)
 lambda.cell.idx <- grep("lambda.cell",colnames(mvSamples2))
 D0.idx <- grep("D0",colnames(mvSamples2))
 burnin2 <- 10
-
 
 #compare expected D plot to truth
 #image will show 
@@ -245,8 +235,3 @@ zlim <- range(c(lambda.cell,lambda.cell.ests),na.rm=TRUE) #use same zlim for plo
 image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
 #estimate, posterior means
 image(x.vals,y.vals,matrix(lambda.cell.ests,n.cells.x,n.cells.y),main="Expected Density",zlim=zlim)
-
-#cell ests vs. truth
-plot(lambda.cell.ests~lambda.cell,pch=16) #remove non-habitat
-abline(0,1,col="darkred",lwd=2)
-
