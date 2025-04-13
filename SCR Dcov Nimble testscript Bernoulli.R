@@ -146,7 +146,7 @@ z.data[1:n] <- 1
 
 #inits for nimble - MUST use z init and N init for data augmentation scheme to work. should use s.init, too.
 Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,p0=runif(1,0.2,0.8),sigma=runif(1,0.2,0.8),
-                 D0=sum(z.init)/(sum(InSS)*res^2),D.beta1=0)
+                 D0=sum(z.init)/(sum(data$InSS)*res^2),D.beta1=0)
 
 #constants for Nimble
 #here, you probably want to center your D.cov. The one I simulated for this testscript is already centered.
