@@ -122,7 +122,7 @@ e2dist  <-  function (x, y){
   matrix(dvec, nrow = nrow(x), ncol = nrow(y), byrow = F)
 }
 getCell  <-  function(s,res,cells){
-  cells[trunc(s[1]/res)+1,trunc(s[2]/res)+1]
+  cells[trunc(s[1]/data$res)+1,trunc(s[2]/data$res)+1]
 }
 alldists <- e2dist(s.init,data$dSS)
 alldists[,data$InSS==0] <- Inf
@@ -146,7 +146,7 @@ z.data[1:n] <- 1
 #inits for nimble
 #inits for nimble - MUST use z init and N init for data augmentation scheme to work. should use s.init, too.
 Niminits <- list(z=z.init,N=sum(z.init>0),s=s.init,lam0=runif(1,0.2,0.8),sigma=runif(1,0.2,0.8),
-                 D0=sum(z.init)/(sum(data$InSS)*res^2),D.beta1=0)
+                 D0=sum(z.init)/(sum(data$InSS)*data$res^2),D.beta1=0)
 
 #constants for Nimble
 #here, you probably want to center your D.cov. The one I simulated for this testscript is already centered.
@@ -157,7 +157,7 @@ constants <- list(M=M,J=J,K1D=K1D,xlim=xlim,ylim=ylim,
 
 #supply data to nimble
 dummy.data <- rep(0,M) #dummy data not used, doesn't really matter what the values are
-Nimdata <- list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=cells,InSS=data$InSS)
+Nimdata <- list(y=y2D,z=z.data,X=X,dummy.data=dummy.data,cells=data$cells,InSS=data$InSS)
 
 # set parameters to monitor
 parameters <- c('N','lambda.N','lam0','sigma','D0',"D.beta1")
