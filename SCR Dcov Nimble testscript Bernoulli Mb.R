@@ -73,7 +73,7 @@ points(X,pch=4,col="darkred",lwd=2)
 D.beta0 <- -1
 D.beta1 <- 0.5
 #what is implied expected N in state space?
-lambda.cell <- exp(D.beta0 + D.beta1*D.cov)*cellArea
+lambda.cell <- InSS*exp(D.beta0 + D.beta1*D.cov)*cellArea
 sum(lambda.cell) #expected N in state space
 
 image(x.vals,y.vals,matrix(lambda.cell,n.cells.x,n.cells.y),main="Expected Density")
